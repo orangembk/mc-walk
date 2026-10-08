@@ -141,6 +141,10 @@ nav.bot button.on{color:var(--c);font-weight:700}
 .qnum{text-align:center;font-size:13px;color:var(--muted)}
 .qq{font-family:Jua,sans-serif;font-size:21px;line-height:1.35;text-align:center;margin:8px 0 6px;word-break:keep-all}
 .qex{font-size:14px;line-height:1.55;background:#FFF1DC;border-radius:12px;padding:10px 12px;margin-top:10px}
+.pbtns{display:flex;gap:8px;margin-top:10px}
+.pbtns button{flex:1;padding:13px 6px;border-radius:14px;background:#fff;border:2px solid var(--line);font-family:Jua,sans-serif;font-size:16px}
+.pbtns.pri button{background:var(--c);color:#fff;border-color:var(--c);font-size:17px;padding:15px 6px;box-shadow:0 3px 0 rgba(0,0,0,.15)}
+.plabel{font-size:13px;color:var(--muted);margin-top:12px;text-align:center}
 .linkbtn{display:block;margin:10px auto 0;color:var(--muted);font-size:13px;text-decoration:underline}
 
 /* toast / banner */
@@ -523,20 +527,33 @@ async function openMission(id){
     const b=mkBtn(d?'다시 풀어 보기':'퀴즈 시작!','bigbtn');b.onclick=()=>{closeModal();runQuiz(m);};body.appendChild(b);
   } else {
     if(d&&d.photo){const u=await photoURL(d.photo);if(u){const im=document.createElement('img');im.className='ph';im.src=u;body.appendChild(im);}}
-    if(m.type==='photo'||true){
-      const pb=mkBtn(m.type==='photo'?(d&&d.photo?'📷 다시 찍기':'📷 사진 찍기'):(d&&d.photo?'📷 인증 사진 다시 찍기':'📷 인증 사진 찍기 (선택)'),m.type==='photo'?'bigbtn':'ghost');
-      pb.onclick=()=>{photoTarget=id;const f=$('#fileIn');if(m.capture)f.setAttribute('capture',m.capture);else f.removeAttribute('capture');f.value='';f.click();};
-      body.appendChild(pb);}
+    if(m.type!=='photo'){const lb=document.createElement('div');lb.className='plabel';lb.textContent=d&&d.photo?'인증 사진 바꾸기':'인증 사진 (선택)';body.appendChild(lb);}
+    body.appendChild(photoButtons(id,m,!!(d&&d.photo),m.type==='photo'));
     if(m.type!=='photo'&&!d){const b=mkBtn('✅ 미션 완료!','bigbtn');b.onclick=()=>{markDone(id);closeModal();};body.appendChild(b);}
   }
+  const bb=mkBtn('🎯 빙고판으로 돌아가기','ghost');bb.onclick=()=>{closeModal();go('bingo');};body.appendChild(bb);
   if(d){const u=mkBtn('완료 취소','linkbtn');u.onclick=()=>{delete S.done[id];save();statusSoon();renderBoard();renderStations();updStats();closeModal();};body.appendChild(u);}
   openModal(body);
 }
 $('#fileIn').addEventListener('change',async e=>{
   const f=e.target.files&&e.target.files[0];if(!f||!photoTarget)return;
   try{toast('사진 저장 중…');const b=await shrink(f);const k=`photo_${photoTarget}`;delete urlCache[k];await putPhoto(k,b);
-    markDone(photoTarget,{photo:k,up:null});enqueue({k:'photo',mission:photoTarget});closeModal();openMission(photoTarget);}catch(err){toast('사진을 저장하지 못했어요. 다시 시도해 주세요.');}
+    markDone(photoTarget,{photo:k,up:null});enqueue({k:'photo',mission:photoTarget});closeModal();photoSaved(photoTarget);}catch(err){toast('사진을 저장하지 못했어요. 다시 시도해 주세요.');}
 });
+// 사진 버튼 2개: 카메라로 찍기 / 앨범에서 고르기
+function pickPhoto(id,useCamera){photoTarget=id;const m=M[id],f=$('#fileIn');
+  if(useCamera)f.setAttribute('capture',m.capture||'environment');else f.removeAttribute('capture');f.value='';f.click();}
+function photoButtons(id,m,has,primary){const row=document.createElement('div');row.className='pbtns'+(primary?' pri':'');
+  const cam=mkBtn(has?'📷 다시 찍기':'📷 카메라로 찍기','');cam.onclick=()=>pickPhoto(id,true);
+  const alb=mkBtn(has?'🖼️ 앨범에서 바꾸기':'🖼️ 앨범에서 고르기','');alb.onclick=()=>pickPhoto(id,false);
+  row.append(cam,alb);return row;}
+// 사진 저장 후 화면: 미리보기 + 빙고판으로 돌아가기
+async function photoSaved(id){const m=M[id];const body=document.createElement('div');
+  body.innerHTML=`<div class="ic">✅</div><h3>사진 저장 완료!</h3><div class="wh">${m.icon} ${m.title}</div>`;
+  const u=await photoURL(S.done[id].photo);if(u){const im=document.createElement('img');im.className='ph';im.src=u;body.appendChild(im);}
+  const back=mkBtn('🎯 빙고판으로 돌아가기','bigbtn');back.onclick=()=>{closeModal();go('bingo');};body.appendChild(back);
+  body.appendChild(photoButtons(id,m,true,false));
+  openModal(body);}
 function mkBtn(t,cls){const b=document.createElement('button');b.className=cls;b.textContent=t;return b;}
 
 /* ---------------- quiz ---------------- */
@@ -624,12 +641,12 @@ $('#settingsBtn').onclick=()=>{
   const b3=mkBtn('🗑️ 기록 모두 지우고 처음부터','ghost');b3.style.color='var(--bad)';
   b3.onclick=async()=>{if(!confirm('GPS 기록, 빙고, 사진을 모두 지울까요?'))return;stopGPS();await clearPhotos();S=fresh();save();location.reload();};
   const dv=document.createElement('div');dv.className='ds';dv.style.fontSize='14px';
-  dv.innerHTML=`<b>☁️ 구글 드라이브 연결</b><br><span style="font-size:12.5px;color:var(--muted)">선생님이 만든 Apps Script 웹 앱 주소와 업로드 키를 넣어요.</span>
+  dv.innerHTML=`<b>☁️ 구글 드라이브 연결</b><br><span style="font-size:12.5px;color:var(--muted)">마천초 결과 폴더로 기본 연결되어 있어요. 「저장하고 연결 확인」으로 연결 상태를 볼 수 있어요. (주소를 비우면 전송을 꺼요)</span>
    <input id="drvUrl" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--line);font-size:14px">
    <input id="drvKey" placeholder="업로드 키" style="width:100%;margin-top:6px;padding:10px;border-radius:10px;border:1px solid var(--line);font-size:14px">
    <div style="font-size:12.5px;color:var(--muted);margin-top:6px">보낼 것 ${S.q.length}개 · 마지막 전송 ${S.lastSync?new Date(S.lastSync).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'없음'}</div>`;
   const bt=mkBtn('🔌 저장하고 연결 확인','bigbtn');bt.style.fontSize='17px';
-  bt.onclick=async()=>{DRIVE={url:dv.querySelector('#drvUrl').value.trim(),key:dv.querySelector('#drvKey').value.trim()};saveDrive();
+  bt.onclick=async()=>{const u0=dv.querySelector('#drvUrl').value.trim();DRIVE={url:u0,key:dv.querySelector('#drvKey').value.trim()||DEFAULT_DRIVE.key,off:!u0};saveDrive();
     if(!DRIVE.url){updCloud();toast('드라이브 연결을 껐어요.');return;}
     bt.disabled=true;bt.textContent='확인 중…';
     try{const r=await post({kind:'ping'});toast(r.ok?`✅ 연결 성공! (${r.folder})`:(r.error==='bad_key'?'업로드 키가 맞지 않아요.':'연결 실패: '+r.error),4000);if(r.ok){statusSoon(1);processQueue();}}
@@ -704,7 +721,9 @@ $('#peakBtn').onclick=()=>{showPeak=true;draw();
 
 /* ---------------- Google Drive (Apps Script) 업로드 ---------------- */
 const DRIVE_KEY='ssal_drive_v1';
-let DRIVE=(()=>{try{return JSON.parse(localStorage.getItem(DRIVE_KEY))||{url:'',key:'ssal1023'};}catch(e){return {url:'',key:'ssal1023'};}})();
+// 마천초 결과 확인 웹앱 (Apps Script) — 기본으로 바로 연결돼요
+const DEFAULT_DRIVE={url:'https://script.google.com/macros/s/AKfycbxGBg18tYBoyZQ_NhtQ06X9-gqwB6oIa4ezqQHXSBbM6Jt6hHP67idWrRChCzeC4JYb4A/exec',key:'ssal1023'};
+let DRIVE=(()=>{try{const d=JSON.parse(localStorage.getItem(DRIVE_KEY));if(d&&(d.url||d.off))return d;}catch(e){}return Object.assign({},DEFAULT_DRIVE);})();
 function saveDrive(){try{localStorage.setItem(DRIVE_KEY,JSON.stringify(DRIVE));}catch(e){}}
 (function(){ // 주소에 ?drive=...&key=... 가 붙어 오면 자동 저장 (QR 코드용)
   try{const u=new URL(location.href);const d=u.searchParams.get('drive'),k=u.searchParams.get('key');
