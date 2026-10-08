@@ -61,6 +61,11 @@ h2.sec{font-family:Jua,sans-serif;font-weight:400;font-size:20px;margin:22px 4px
 .bigbtn{display:block;width:100%;padding:16px;border-radius:16px;background:var(--c);color:#fff;font-family:Jua,sans-serif;font-size:21px;margin-top:14px;box-shadow:0 4px 0 rgba(0,0,0,.15)}
 .bigbtn:disabled{opacity:.4}
 .ghost{display:block;width:100%;padding:12px;border-radius:14px;border:2px solid var(--line);background:#fff;font-size:15px;margin-top:10px;color:var(--muted)}
+.viewbtn{display:flex;align-items:center;gap:12px;margin-top:10px;padding:14px 16px;border-radius:16px;background:var(--map);color:#fff;text-decoration:none}
+.viewbtn .vi{font-size:28px;line-height:1}
+.viewbtn b{display:block;font-family:Jua,sans-serif;font-weight:400;font-size:19px}
+.viewbtn small{display:block;font-size:12.5px;opacity:.75;margin-top:1px}
+.viewbtn .va{margin-left:auto;font-size:26px;opacity:.7}
 .tips{font-size:13.5px;color:var(--muted);line-height:1.6;background:#fff;border-radius:14px;padding:12px 14px;margin-top:14px;border:1px solid var(--line)}
 .tips b{color:var(--ink)}
 
@@ -170,6 +175,9 @@ nav.bot button.on{color:var(--c);font-weight:700}
   <div class="groups" id="groupBtns"></div>
   <button class="bigbtn" id="goBtn" disabled>산책 시작하기</button>
   <button class="ghost" id="simBtn">🧪 연습 모드 (가짜 GPS로 미리 보기)</button>
+  <a class="viewbtn" id="viewBtn" href="#" target="_blank" rel="noopener">
+    <span class="vi">📊</span><span><b>모둠별 결과 확인</b><small>선생님용 · 비밀번호가 필요해요</small></span><span class="va">›</span>
+  </a>
   <div class="tips">
     <b>인솔자 선생님께</b><br>
     · 시작하면 <b>위치 사용 허용</b>을 눌러 주세요.<br>
@@ -651,7 +659,7 @@ $('#settingsBtn').onclick=()=>{
     bt.disabled=true;bt.textContent='확인 중…';
     try{const r=await post({kind:'ping'});toast(r.ok?`✅ 연결 성공! (${r.folder})`:(r.error==='bad_key'?'업로드 키가 맞지 않아요.':'연결 실패: '+r.error),4000);if(r.ok){statusSoon(1);processQueue();}}
     catch(e){toast('연결하지 못했어요. 주소와 인터넷을 확인해 주세요.',4000);}
-    bt.disabled=false;bt.textContent='🔌 저장하고 연결 확인';updCloud();};
+    bt.disabled=false;bt.textContent='🔌 저장하고 연결 확인';updCloud();updViewBtn();};
   dv.appendChild(bt);body.appendChild(dv);
   dv.querySelector('#drvUrl').value=DRIVE.url||'';dv.querySelector('#drvKey').value=DRIVE.key||'';
   [b1,b4,b2,b3].forEach(b=>body.appendChild(b));
@@ -782,6 +790,9 @@ async function sendResults(auto){
     toast(auto?'🏫 학교 도착! 결과를 드라이브로 보내요.':'☁️ 결과를 드라이브로 보내는 중이에요.',3500);}catch(e){toast('결과 이미지를 만들지 못했어요.');}
 }
 $('#sendDrive').onclick=()=>sendResults(false);
+// 첫 화면의 결과 확인 버튼 → Apps Script 결과 확인 앱
+function updViewBtn(){const u=DRIVE.url||DEFAULT_DRIVE.url;const a=$('#viewBtn');a.href=u;a.classList.toggle('hidden',!u);}
+updViewBtn();
 updCloud();
 heroSvg();
 if(S.group){pick=S.group;enterMain();}else showStart();
