@@ -1400,10 +1400,26 @@ setInterval(()=>processQueue(),20000);
 window.addEventListener('online',()=>processQueue());
 async function post(body){
   const ac=new AbortController();const t=setTimeout(()=>ac.abort(),60000);
-  try{const r=await fetch(DRIVE.url,{method:'POST',body:JSON.stringify(Object.assign({key:DRIVE.key,group:S.group,sim:!!S.sim,device:{id:DEV.id,name:DEV.name}},body)),signal:ac.signal});
+  try{const r=await fetch(DRIVE.url,{method:'POST',body:JSON.stringify(Object.assign({key:DRIVE.key,group:S.group,sim:!!S.sim,device:{id:DEV.id,name:DEV.name},epoch:S.epoch||0,since:recordSince()},body)),signal:ac.signal});
     const txt=await r.text();let j;try{j=JSON.parse(txt);}catch(e){return {ok:false,error:'bad_response'};}
-    if(j&&j.ok&&j.group)applyRemote(j.group);return j;}
+    if(j&&j.ok&&j.epoch)handleEpoch(j.epoch,j.stale);
+    if(j&&j.ok&&j.group&&!j.stale)applyRemote(j.group);return j;}
   finally{clearTimeout(t);}}
+// 선생님이 결과 확인 앱에서 기록을 지운 경우(초기화 시각 epoch)
+function recordSince(){const ts=[S.t0||Infinity,...Object.values(S.done||{}).map(d=>d.t||Infinity)];const m=Math.min(...ts);return isFinite(m)?m:Date.now();}
+function recordEmpty(){return !S.track.length&&!Object.keys(S.done).length;}
+function handleEpoch(e,stale){
+  if((S.epoch||0)>=e)return;
+  if(recordEmpty()||recordSince()>e){S.epoch=e;save();if(stale)statusSoon(1);return;}   // 초기화 뒤에 시작한 기록은 그대로
+  // 초기화 전에 시작한 기록 → 이 휴대폰 기록도 새로 시작
+  const g=S.group,sim=S.sim;const wasRec=S.recording;stopGPS();
+  S=fresh();S.group=g;S.sim=sim;S.epoch=e;saveNow();clearPhotos();Object.keys(urlCache).forEach(k=>delete urlCache[k]);
+  recomputeCoverage();setRecBtn();renderStations();renderBoard();updStats();draw();updCloud();
+  if(!sim)startGPSPassive();
+  const body=document.createElement('div');
+  body.innerHTML=`<div class="ic">🧹</div><h3>기록이 새로 시작됐어요</h3><div class="ds">선생님이 결과 확인 앱에서 이전 기록을 지웠어요. 이 휴대폰에 있던 예전 경로·빙고·사진 기록도 비웠어요.${wasRec?'<br><b>산책 중이었다면 「▶ 기록 시작」을 다시 눌러 주세요.</b>':''}</div>`;
+  const ok=mkBtn('확인','bigbtn');ok.onclick=()=>{closeModal();go('map');};body.appendChild(ok);openModal(body);
+}
 // 같은 모둠 다른 휴대폰의 완료 미션·위치 반영
 function applyRemote(gr){const before=JSON.stringify(S.remote&&S.remote.done||{});S.remote={done:gr.done||{},devices:gr.devices||[],at:Date.now()};save();
   const changed=before!==JSON.stringify(S.remote.done);
